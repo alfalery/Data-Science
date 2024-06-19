@@ -1,17 +1,11 @@
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using TMPro;
-using UnityEngine.Networking;
-using UnityEngine.UI;
-using System.Collections;
-using System.Collections.Generic;
 
 [RequireComponent(typeof(ARPlaneManager))]
 public class PlaneSizeDisplay : MonoBehaviour
 {
     private ARPlaneManager arPlaneManager;
-    private Dictionary<ARPlane, TextMeshPro> planeLabels = new Dictionary<ARPlane, TextMeshPro>();
-    public GameObject planePrefab; // Prefab yang sudah ada, yang berisi tombol
 
     void Awake()
     {
@@ -32,7 +26,6 @@ public class PlaneSizeDisplay : MonoBehaviour
     {
         foreach (var plane in eventArgs.added)
         {
-            AttachPrefabToPlane(plane);
             DisplayPlaneSize(plane);
         }
 
@@ -42,86 +35,40 @@ public class PlaneSizeDisplay : MonoBehaviour
         }
     }
 
-    void AttachPrefabToPlane(ARPlane plane)
-    {
-        GameObject instantiatedPrefab = Instantiate(planePrefab, plane.transform);
-        instantiatedPrefab.transform.localPosition = Vector3.zero;
-
-        // Adjust button size and rotation to face the camera
-        Button saveButton = instantiatedPrefab.transform.Find("SaveButton").GetComponent<Button>();
-        saveButton.onClick.AddListener(() => OnSaveButtonClicked(plane));
-    }
-
     void DisplayPlaneSize(ARPlane plane)
     {
+        // Menghitung ukuran plane
         Vector2 planeSize = plane.size;
         float width = planeSize.x;
         float height = planeSize.y;
         float area = width * height;
 
+        // Log ukuran untuk debugging
         Debug.Log($"Detected a plane with width: {width} meters, height: {height} meters, area: {area} square meters.");
 
+        // Temukan atau buat komponen TextMeshPro pada prefab
         Transform labelTransform = plane.transform.Find("SizeLabel");
-        TextMeshPro labelTMP;
-
         if (labelTransform == null)
         {
             GameObject labelObject = new GameObject("SizeLabel");
             labelTransform = labelObject.transform;
             labelTransform.SetParent(plane.transform, false);
 
-            labelTMP = labelObject.AddComponent<TextMeshPro>();
-            labelTMP.fontSize = 3;
-            labelTMP.alignment = TextAlignmentOptions.Center;
-
-            planeLabels[plane] = labelTMP; // Store reference to the label
-        }
-        else
-        {
-            labelTMP = labelTransform.GetComponent<TextMeshPro>();
+            TextMeshPro label = labelObject.AddComponent<TextMeshPro>();
+            label.fontSize = 3; // Sesuaikan ukuran font sesuai kebutuhan
+            label.alignment = TextAlignmentOptions.Center;
         }
 
+        TextMeshPro labelTMP = labelTransform.GetComponent<TextMeshPro>();
         labelTMP.text = $"Width: {width:F2} m\nHeight: {height:F2} m\nArea: {area:F2} sq m";
         labelTMP.gameObject.SetActive(true);
 
+        // Menempatkan label di tengah-tengah plane
         labelTransform.localPosition = new Vector3(0, 0, 0);
-        labelTransform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
+        labelTransform.localScale = new Vector3(0.1f, 0.1f, 0.1f); // Sesuaikan skala sesuai kebutuhan
+
+        // Mengatur label agar selalu menghadap kamera
         labelTransform.LookAt(Camera.main.transform);
-        labelTransform.Rotate(0, 180, 0);
-    }
-
-    void OnSaveButtonClicked(ARPlane plane)
-    {
-        Vector2 planeSize = plane.size;
-        float width = planeSize.x;
-        float height = planeSize.y;
-        float area = width * height;
-
-        // Start coroutine to send plane data to API
-        StartCoroutine(SendPlaneDataToAPI(width, height, area));
-    }
-
-    private IEnumerator SendPlaneDataToAPI(float width, float height, float area)
-    {
-        string apiUrl = "YOUR_API_ENDPOINT_HERE"; // Replace with your actual API endpoint
-        PlaneData planeData = new PlaneData(width, height, area);
-
-        string jsonData = JsonUtility.ToJson(planeData);
-        UnityWebRequest request = new UnityWebRequest(apiUrl, "POST");
-        byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonData);
-        request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        request.downloadHandler = new DownloadHandlerBuffer();
-        request.SetRequestHeader("Content-Type", "application/json");
-
-        yield return request.SendWebRequest();
-
-        if (request.result == UnityWebRequest.Result.Success)
-        {
-            Debug.Log("Data successfully sent to the API.");
-        }
-        else
-        {
-            Debug.LogError($"Error sending data to API: {request.error}");
-        }
+        labelTransform.Rotate(0, 180, 0); // Menyesuaikan rotasi agar tidak terbalik
     }
 }
